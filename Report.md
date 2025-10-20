@@ -19,3 +19,6 @@ Perubahan yang dilakukan pada code:
 2.  Penambahan logika deteksi piksel (int threshold)
 3.  Penambahan visualisasi hasil (pakai QLabel & QPainter)
 4.  Perubahan pada CustomMatrix
+
+Link AI:
+https://gemini.google.com/share/9eb49c60f39c 
