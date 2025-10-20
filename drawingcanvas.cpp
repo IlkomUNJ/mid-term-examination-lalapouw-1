@@ -1,98 +1,100 @@
 #include "drawingcanvas.h"
+#include <QLabel>
+#include <QPainter>
+#include <QPen>
+#include <iostream>
 
-DrawingCanvas::DrawingCanvas(QWidget *parent)  {
+DrawingCanvas::DrawingCanvas(QWidget *parent) {
     // Set a minimum size for the canvas
     setMinimumSize(this->WINDOW_WIDTH, this->WINDOW_HEIGHT);
     // Set a solid background color
     setStyleSheet("background-color: white; border: 1px solid gray;");
 }
 
-void DrawingCanvas::clearPoints(){
+void DrawingCanvas::clearPoints() {
     m_points.clear();
-    // Trigger a repaint to clear the canvas
-    update();
+    update(); // Trigger repaint to clear the canvas
 }
 
-void DrawingCanvas::paintLines(){
-    /* Todo
-     * Implement lines drawing per even pair
-    */
-
+void DrawingCanvas::paintLines() {
     isPaintLinesClicked = true;
     update();
 }
 
-void DrawingCanvas::segmentDetection(){
-    QPixmap pixmap = this->grab(); //
+void DrawingCanvas::segmentDetection() {
+    QPixmap pixmap = this->grab();
     QImage image = pixmap.toImage();
 
-    cout << "image width " << image.width() << endl;
-    cout << "image height " << image.height() << endl;
+    const int windowSize = 15;
+    const int halfWindow = windowSize / 2;
+    const int threshold = 20;
 
-    //To not crash we set initial size of the matrix
-    vector<CustomMatrix> windows(image.width()*image.height());
+    QPixmap resultPixmap = pixmap;
+    QPainter painter(&resultPixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QBrush(QColor(128, 0, 128, 80)));
 
-    // Get the pixel value as an ARGB integer (QRgb is a typedef for unsigned int)
-    for(int i = 1; i < image.width()-1;i++){
-        for(int j = 1; j < image.height()-1;j++){
-            bool local_window[3][3] = {false};
+    int totalSegments = 0;
 
-            for(int m=-1;m<=1;m++){
-                for(int n=-1;n<=1;n++){
-                    QRgb rgbValue = image.pixel(i+m, j+n);
-                    local_window[m+1][n+1] = (rgbValue != 0xffffffff);
+    // Scan window per area 10x10
+    for (int x = halfWindow; x < image.width() - halfWindow; x += windowSize) {
+        for (int y = halfWindow; y < image.height() - halfWindow; y += windowSize) {
+            int nonWhite = 0;
+
+            for (int i = -halfWindow; i < halfWindow; i++) {
+                for (int j = -halfWindow; j < halfWindow; j++) {
+                    if (image.pixel(x + i, y + j) != 0xffffffff)
+                        nonWhite++;
                 }
             }
 
-            CustomMatrix mat(local_window);
-
-            windows.push_back(mat);
+            if (nonWhite > threshold) {
+                painter.drawRect(x - halfWindow, y - halfWindow, windowSize, windowSize);
+                totalSegments++;
+            }
         }
     }
-    return;
+
+    painter.end();
+
+    QLabel *preview = new QLabel;
+    preview->setPixmap(resultPixmap);
+    preview->setWindowTitle(QString("Segment Detection Result — %1 segments").arg(totalSegments));
+    preview->resize(image.size());
+    preview->show();
+
+    std::cout << "Total segments detected: " << totalSegments << std::endl;
 }
 
-void DrawingCanvas::paintEvent(QPaintEvent *event){
+void DrawingCanvas::paintEvent(QPaintEvent *event) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
 
-    // Set up the pen and brush for drawing the points
-    QPen pen(Qt::blue, 5);
+    QPen pen(Qt::blue, 3);
     painter.setPen(pen);
     painter.setBrush(QBrush(Qt::blue));
 
-    // Draw a small circle at each stored point
-    for (const QPoint& point : std::as_const(m_points)) {
+    for (const QPoint &point : std::as_const(m_points)) {
         painter.drawEllipse(point, 3, 3);
     }
 
-    if(isPaintLinesClicked){
-        cout << "paint lines block is called" << endl;
+    if (isPaintLinesClicked) {
+        std::cout << "paint lines block is called" << std::endl;
         pen.setColor(Qt::red);
-        pen.setWidth(4); // 4-pixel wide line
+        pen.setWidth(4);
         pen.setStyle(Qt::SolidLine);
         painter.setPen(pen);
 
-        // Set the painter's pen to our custom pen.
-        painter.setPen(pen);
-
-        for(int i=0;i<m_points.size()-1;i+=2){
-            //cout << m_points[i].x() << endl;
-            painter.drawLine(m_points[i], m_points[i+1]);
+        for (int i = 0; i < m_points.size() - 1; i += 2) {
+            painter.drawLine(m_points[i], m_points[i + 1]);
         }
-        isPaintLinesClicked = false;
 
-        //return painter pen to blue
-        pen.setColor(Qt::blue);
-        painter.setPen(pen);
+        isPaintLinesClicked = false;
     }
 }
 
 void DrawingCanvas::mousePressEvent(QMouseEvent *event) {
-    // Add the mouse click position to our vector of points
     m_points.append(event->pos());
-    // Trigger a repaint
     update();
 }
-
-
